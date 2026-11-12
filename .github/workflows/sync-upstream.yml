@@ -32,10 +32,6 @@ jobs:
         with:
           ref: master
           fetch-depth: 0
-          # GITHUB_TOKEN can never push changes under .github/workflows/, which
-          # upstream edits often, so the push needs a PAT with the Workflows
-          # permission. Falls back to GITHUB_TOKEN if the secret is absent.
-          token: ${{ secrets.SYNC_TOKEN || github.token }}
 
       - name: Fetch upstream
         run: |
@@ -64,6 +60,30 @@ jobs:
             echo "result=conflict" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Keep the fork's workflow files
+        if: steps.merge.outputs.result == 'clean'
+        run: |
+          # GITHUB_TOKEN is a GitHub App token and is refused permission to
+          # create or update anything under .github/workflows/. Reset that
+          # directory to the fork's own copy so the merge carries no workflow
+          # changes at all; every one of them is disabled on this fork anyway.
+          # Index only: the working tree is left untouched.
+          git ls-tree -r HEAD^1 -- .github/workflows/ | while read -r mode _type sha path; do
+            git update-index --add --cacheinfo "$mode,$sha,$path"
+          done
+
+          # Drop workflow files the merge newly added.
+          comm -13 \
+            <(git ls-tree -r --name-only HEAD^1 -- .github/workflows/ | sort) \
+            <(git ls-files .github/workflows/ | sort) > /tmp/wf-added.txt || true
+          if [ -s /tmp/wf-added.txt ]; then
+            xargs -r git rm -q --cached < /tmp/wf-added.txt
+          fi
+
+          if ! git diff --cached --quiet HEAD; then
+            git commit --amend --no-edit
+          fi
+
       - name: Push merged master
         if: steps.merge.outputs.result == 'clean'
         run: git push origin HEAD:master
@@ -71,7 +91,7 @@ jobs:
       - name: Open a pull request for the conflict
         if: steps.merge.outputs.result == 'conflict'
         env:
-          GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
           PR_BODY: |
             Upstream `master` no longer merges cleanly with this fork.
 

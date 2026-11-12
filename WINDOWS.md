@@ -66,6 +66,13 @@ this fork's `master` every Monday, and on demand from the Actions tab.
 - A conflict is never auto-resolved: the run creates a `sync/upstream-*` branch
   and opens a pull request, so nothing lands on `master` unreviewed.
 
+Upstream's changes to `.github/workflows/` are deliberately dropped from the
+merge. `GITHUB_TOKEN` is a GitHub App token, and GitHub refuses to let it create
+or update anything under that path — that rejection is what broke the sync on
+2026-11-02 and 2026-11-09. Keeping the fork's own workflow files means the push
+carries no workflow changes, so no personal access token is needed. Every
+workflow except the sync is disabled here, so nothing is lost by this.
+
 Conflicts can only come from this fork's own divergences — the 4 deleted
 `:socket` files, `searx/valkeydb.py`, the top of `README.rst`, or the tail of
 `.gitignore`.
