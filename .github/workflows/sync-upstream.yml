@@ -32,6 +32,10 @@ jobs:
         with:
           ref: master
           fetch-depth: 0
+          # GITHUB_TOKEN can never push changes under .github/workflows/, which
+          # upstream edits often, so the push needs a PAT with the Workflows
+          # permission. Falls back to GITHUB_TOKEN if the secret is absent.
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
 
       - name: Fetch upstream
         run: |
@@ -67,7 +71,7 @@ jobs:
       - name: Open a pull request for the conflict
         if: steps.merge.outputs.result == 'conflict'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
           PR_BODY: |
             Upstream `master` no longer merges cleanly with this fork.
 
